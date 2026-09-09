@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Рассадка учеников</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
+<style>
+  * { font-family: 'Inter', sans-serif; }
+  body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .gradient-text {
+    background: linear-gradient(90deg, #a78bfa, #374a61, #34d399);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    background-size: 200% auto;
+    animation: shine 4s linear infinite;
+  }
+  @keyframes shine {
+    to { background-position: 200% center; }
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-15px); }
+  }
+  .float-slow { animation: float 7s ease-in-out infinite; }
+  .float-medium { animation: float 5s ease-in-out infinite; }
+  .glow {
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.25);
+  }
+  .fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.4);
+    border-color: #8b5cf6;
+  }
+  .student-card {
+    cursor: grab;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .student-card:active {
+    cursor: grabbing;
+  }
+  .student-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
+  }
+  .student-card.dragging {
+    opacity: 0.4;
+    transform: scale(0.95);
+  }
+  .seat {
+    transition: all 0.2s;
+    min-height: 70px;
+    position: relative;
+  }
+  .seat.drag-over {
+    background: rgba(139, 92, 246, 0.25) !important;
+    border-color: #a78bfa !important;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    transform: scale(1.03);
+  }
+  .seat.occupied {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.15));
+    border-color: rgba(139, 92, 246, 0.5);
+  }
+  .desk {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
+    border: 2px solid rgba(148, 163, 184, 0.2);
+    border-radius: 16px;
+    padding: 8px;
+    transition: all 0.2s;
+  }
+  .desk:hover {
+    border-color: rgba(148, 163, 184, 0.4);
+  }
+  .desk-label {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .placed-student {
+    background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    animation: pop 0.3s ease-out;
+  }
+  @keyframes pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .remove-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .remove-btn:hover {
+    background: #ef4444;
+    transform: scale(1.1);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  .hidden-el { display: none !important; }
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    padding: 12px 20px;
+    border-radius: 12px;
+    color: white;
+    z-index: 100;
+    animation: slideIn 0.3s ease-out;
+    backdrop-filter: blur(10px);
+  }
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .toast.hide {
+    animation: slideOut 0.3s ease-out forwards;
+  }
+  @keyframes slideOut {
+    to { transform: translateX(100%); opacity: 0; }
+  }
+  .empty-state {
+    border: 2px dashed rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    color: #64748b;
+  }
+  .scroll-area::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scroll-area::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  .scroll-area::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.4);
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body class="text-white">
+
+<!-- Background blobs -->
+<div class="blob bg-purple-600 w-96 h-96 top-0 -left-20 float-slow"></div>
+<div class="blob bg-blue-600 w-96 h-96 top-40 right-0 float-medium"></div>
+<div class="blob bg-emerald-600 w-80 h-80 bottom-0 left-1/3 float-slow"></div>
+
+<div class="relative z-10 min-h-screen flex flex-col">
+  
+  <!-- Header -->
+  <header class="p-6 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center glow">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+      </div>
+      <span class="text-xl font-bold gradient-text">ClassSeating</span>
+    </div>
+    <button id="resetBtn" class="btn-secondary px-4 py-2 rounded-xl text-sm font-semibold hidden-el">
+      ← Новый класс
+    </button>
+  </header>
+
+  <!-- Setup form -->
+  <main id="setupSection" class="flex-1 flex items-center justify-center px-6 py-8">
+    <div class="max-w-2xl w-full">
+      <div class="text-center mb-10">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">
+          <span class="gradient-text">Рассадка учеников</span>
+        </h1>
+        <p class="text-slate-400 text-lg">
+          Введите имена учеников и настройте размеры класса
+        </p>
+      </div>
+
+      <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 glow">
+        
+        <!-- Names input -->
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-slate-300 mb-2">
+            👥 Имена учеников
+          </label>
+          <textarea 
+            id="namesInput"
+            rows="5"
+            placeholder="Иванов Иван&#10;Петров Пётр, Сидорова Анна&#10;Смирнов Алексей"
+            class="w-full bg-slate-900/60 border border-white/10 rounded-2xl p-4 text-white placeholder-slate-500 resize-none"
+          ></textarea>
+          <p class="text-xs text-slate-500 mt-2">
+            Разделители: перенос строки или запятая
+          </p>
+        </div>
+
+        <!-- Class size -->
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="block text-sm font-semibold text-slate-300 mb-2">
+              Количество рядов
+            </label>
+            <input 
+              type="number" 
+              id="desksInput"
+              min="1" 
+              max="10" 
+              value="4"
+              class="w-full bg-slate-900/60 border border-white/10 rounded-2xl p-4 text-white"
+            >
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-300 mb-2">
+             Парт в ряду
+            </label>
+            <input 
+              type="number" 
+              id="rowsInput"
+              min="1" 
+              max="10" 
+              value="3"
+              class="w-full bg-slate-900/60 border border-white/10 rounded-2xl p-4 text-white"
+            >
+          </div>
+        </div>
+        <button id="addBtn" class="btn-primary w-full py-4 rounded-2xl font-semibold text-lg text-white">
+          ✨ Добавить
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Workspace -->
+  <main id="workspaceSection" class="flex-1 px-6 py-6 hidden-el">
+    <div class="grid lg:grid-cols-[340px_1fr] gap-6 h-full">
+      
+      <!-- Left: students list -->
+      <aside class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 flex flex-col max-h-[calc(100vh-140px)]">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold">Ученики</h2>
+          <span id="studentsCount" class="text-xs text-slate-400 bg-slate-900/60 px-3 py-1 rounded-full">0</span>
+        </div>
+        <div id="studentsList" class="flex-1 overflow-y-auto scroll-area space-y-2 pr-1">
+          <!-- student cards -->
+        </div>
+      </aside>
+
+      <!-- Right: classroom -->
+      <section class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col max-h-[calc(100vh-140px)]">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold">Класс</h2>
+          <span id="seatsInfo" class="text-xs text-slate-400 bg-slate-900/60 px-3 py-1 rounded-full"></span>
+        </div>
+        
+        <!-- Blackboard -->
+        <div class="mb-6 py-3 bg-slate-900/60 border border-white/10 rounded-xl text-center text-slate-400 text-sm font-semibold">
+          📚 ДОСКА
+        </div>
+
+        <div id="classroom" class="flex-1 overflow-auto scroll-area">
+          <!-- desks grid -->
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="p-4 text-center text-slate-500 text-xs">
+    Перетащите ученика на парту • Нажмите × чтобы вернуть
+  </footer>
+</div>
+
+<script>
+  const namesInput = document.getElementById('namesInput');
+  const rowsInput = document.getElementById('rowsInput');
+  const desksInput = document.getElementById('desksInput');
+  const addBtn = document.getElementById('addBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const setupSection = document.getElementById('setupSection');
+  const workspaceSection = document.getElementById('workspaceSection');
+  const studentsList = document.getElementById('studentsList');
+  const classroom = document.getElementById('classroom');
+  const studentsCount = document.getElementById('studentsCount');
+  const seatsInfo = document.getElementById('seatsInfo');
+
+  // State
+  let students = []; // { id, name, placed: bool }
+  let rows = 0;
+  let desksPerRow = 0;
+  let draggedStudentId = null;
+
+  // Toast
+  function showToast(msg, isError = false) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    if (isError) toast.style.borderColor = '#ef4444';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('hide');
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
+  // Parse names
+  function parseNames(text) {
+    return text
+      .split(/[\n,]+/)
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+  }
+
+  // Create student card element
+  function createStudentCard(student) {
+    const card = document.createElement('div');
+    card.className = 'student-card bg-gradient-to-r from-purple-600/80 to-blue-600/80 border border-white/20 rounded-xl p-3 text-white font-semibold text-sm flex items-center justify-between';
+    card.draggable = true;
+    card.dataset.studentId = student.id;
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'truncate';
+    nameSpan.textContent = student.name;
+    
+    const dragIcon = document.createElement('span');
+    dragIcon.className = 'text-white/50 text-xs ml-2 flex-shrink-0';
+    dragIcon.innerHTML = '⋮⋮';
+    
+    card.appendChild(nameSpan);
+    card.appendChild(dragIcon);
+
+    card.addEventListener('dragstart', (e) => {
+      draggedStudentId = student.id;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', student.id);
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedStudentId = null;
+    });
+
+    return card;
+  }
+
+  // Create seat element
+  function createSeat(rowIdx, deskIdx, seatIdx) {
+    const seat = document.createElement('div');
+    seat.className = 'seat bg-slate-900/40 border border-white/10 rounded-xl p-2 flex items-center justify-center';
+    seat.dataset.row = rowIdx;
+    seat.dataset.desk = deskIdx;
+    seat.dataset.seat = seatIdx;
+
+    seat.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      seat.classList.add('drag-over');
+    });
+    seat.addEventListener('dragleave', () => {
+      seat.classList.remove('drag-over');
+    });
+    seat.addEventListener('drop', (e) => {
+      e.preventDefault();
+      seat.classList.remove('drag-over');
+      const studentId = e.dataTransfer.getData('text/plain');
+      placeStudent(studentId, seat);
+    });
+
+    return seat;
+  }
+
+  // Place student into seat
+  function placeStudent(studentId, seat) {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+
+    // If student is already placed somewhere else, remove from old seat
+    if (student.placed) {
+      const oldSeat = classroom.querySelector(`.seat[data-student-id="${studentId}"]`);
+      if (oldSeat) {
+        oldSeat.innerHTML = '';
+        oldSeat.classList.remove('occupied');
+        oldSeat.removeAttribute('data-student-id');
+      }
+    }
+
+    // If target seat is already occupied by another student, move that student back to list
+    const existingStudentId = seat.dataset.studentId;
+    if (existingStudentId && existingStudentId !== studentId) {
+      const existingStudent = students.find(s => s.id === existingStudentId);
+      if (existingStudent) {
+        existingStudent.placed = false;
+        const card = createStudentCard(existingStudent);
+        studentsList.appendChild(card);
+        updateStudentsCount();
+      }
+      seat.innerHTML = '';
+      seat.classList.remove('occupied');
+    }
+
+    // Place the student
+    student.placed = true;
+    seat.dataset.studentId = studentId;
+    seat.classList.add('occupied');
+    seat.innerHTML = '';
+
+    const placed = document.createElement('div');
+    placed.className = 'placed-student';
+    
+    const nameEl = document.createElement('span');
+    nameEl.className = 'truncate';
+    nameEl.textContent = student.name;
+    
+    const removeBtn = document.createElement('div');
+    removeBtn.className = 'remove-btn';
+    removeBtn.innerHTML = '×';
+    removeBtn.title = 'Вернуть в список';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeStudentFromSeat(studentId);
+    });
+    
+    placed.appendChild(nameEl);
+    placed.appendChild(removeBtn);
+    seat.appendChild(placed);
+
+    // Remove from students list
+    const existingCard = studentsList.querySelector(`[data-student-id="${studentId}"]`);
+    if (existingCard) existingCard.remove();
+    updateStudentsCount();
+    updateSeatsInfo();
+  }
+
+  // Remove student from seat back to list
+  function removeStudentFromSeat(studentId) {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    
+    const seat = classroom.querySelector(`.seat[data-student-id="${studentId}"]`);
+    if (seat) {
+      seat.innerHTML = '';
+      seat.classList.remove('occupied');
+      delete seat.dataset.studentId;
+    }
+    
+    student.placed = false;
+    const card = createStudentCard(student);
+    studentsList.appendChild(card);
+    updateStudentsCount();
+    updateSeatsInfo();
+  }
+
+  // Update counters
+  function updateStudentsCount() {
+    const remaining = students.filter(s => !s.placed).length;
+    studentsCount.textContent = `${remaining} из ${students.length}`;
+  }
+
+  function updateSeatsInfo() {
+    const total = rows * desksPerRow * 2;
+    const occupied = students.filter(s => s.placed).length;
+    seatsInfo.textContent = `${occupied} / ${total} мест занято`;
+  }
+
+  // Render classroom
+  function renderClassroom() {
+    classroom.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'grid gap-6';
+    grid.style.gridTemplateColumns = `repeat(${desksPerRow}, minmax(0, 1fr))`;
+    
+    for (let r = 0; r < rows; r++) {
+      for (let d = 0; d < desksPerRow; d++) {
+        const desk = document.createElement('div');
+        desk.className = 'desk relative';
+        
+        const label = document.createElement('div');
+        label.className = 'desk-label';
+        label.textContent = `Ряд ${d + 1} · Парта ${r + 1}`;
+        desk.appendChild(label);
+        
+        const seatsWrap = document.createElement('div');
+        seatsWrap.className = 'grid grid-cols-2 gap-2 pt-2';
+        seatsWrap.appendChild(createSeat(r, d, 0));
+        seatsWrap.appendChild(createSeat(r, d, 1));
+        desk.appendChild(seatsWrap);
+        
+        grid.appendChild(desk);
+      }
+    }
+    
+    classroom.appendChild(grid);
+  }
+
+  // Render students list
+  function renderStudents() {
+    studentsList.innerHTML = '';
+    students.forEach(s => {
+      if (!s.placed) {
+        studentsList.appendChild(createStudentCard(s));
+      }
+    });
+    updateStudentsCount();
+  }
+
+  // Handle add button
+  addBtn.addEventListener('click', () => {
+    const names = parseNames(namesInput.value);
+    const r = parseInt(rowsInput.value);
+    const d = parseInt(desksInput.value);
+
+    if (names.length === 0) {
+      showToast('Введите хотя бы одно имя ученика', true);
+      namesInput.focus();
+      return;
+    }
+    if (!r || r < 1) {
+      showToast('Укажите количество рядов', true);
+      rowsInput.focus();
+      return;
+    }
+    if (!d || d < 1) {
+      showToast('Укажите количество парт в ряду', true);
+      desksInput.focus();
+      return;
+    }
+
+    rows = r;
+    desksPerRow = d;
+    const totalSeats = r * d * 2;
+
+    // Create students
+    students = names.map((name, idx) => ({
+      id: `s_${idx}_${Date.now()}`,
+      name: name,
+      placed: false
+    }));
+    if (students.length > totalSeats) {
+      showToast(`⚠️ Учеников (${students.length}) больше, чем мест (${totalSeats})`, true);
+      
+      return
+    }
+    // Switch view
+    setupSection.classList.add('hidden-el');
+    workspaceSection.classList.remove('hidden-el');
+    resetBtn.classList.remove('hidden-el');
+
+    renderStudents();
+    renderClassroom();
+    updateSeatsInfo();
+  });
+
+  // Reset
+  resetBtn.addEventListener('click', () => {
+    if (confirm('Начать новый класс? Текущие данные будут потеряны.')) {
+      students = [];
+      rows = 0;
+      desksPerRow = 0;
+      studentsList.innerHTML = '';
+      classroom.innerHTML = '';
+      namesInput.value = '';
+      setupSection.classList.remove('hidden-el');
+      workspaceSection.classList.add('hidden-el');
+      resetBtn.classList.add('hidden-el');
+    }
+  });
+
+  // Allow drop back to students list (return student)
+  studentsList.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+  studentsList.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const studentId = e.dataTransfer.getData('text/plain');
+    if (studentId && studentId.startsWith('s_')) {
+      removeStudentFromSeat(studentId);
+    }
+  });
+</script>
+
+</body>
+</html>
